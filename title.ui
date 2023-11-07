@@ -80,7 +80,7 @@
      </font>
     </property>
     <property name="text">
-     <string>ФИО</string>
+     <string>ФИ</string>
     </property>
    </widget>
    <widget class="QLabel" name="label_3">

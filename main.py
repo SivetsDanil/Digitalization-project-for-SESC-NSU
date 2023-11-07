@@ -1,10 +1,10 @@
-import sys
 import sqlite3
+import sys
 
 import PyQt5
-from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
 from PyQt5 import uic
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QStatusBar, QTableWidgetItem, QTableView, QTableWidget
+from PyQt5.QtCore import QDate
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QTableWidget, QWidget, QCalendarWidget
 
 
 class MainWindow(QMainWindow):
@@ -36,9 +36,15 @@ class StartWindow(MainWindow):
         self.statusbar = QStatusBar(self)
         self.statusbar.setObjectName("statusbar")
         self.setStatusBar(self.statusbar)
-        self.user_name.setPlaceholderText("Иванов Иван Иванович")
+        self.user_name.setPlaceholderText("Иванов Иван")
         self.room_number.setPlaceholderText("222")
+
         self.clear()
+
+        self.user_name.setText("Сивец Данил")
+        self.room_number.setText("236")
+
+
 
     def log_in(self):
         self.block_num = self.room_number.text()
@@ -46,7 +52,7 @@ class StartWindow(MainWindow):
         if self.check_log_in():
             self.block_num = self.room_number.text()
             self.user = self.user_name.text()
-            self.menu_form = MenuForm(self)
+            self.menu_form = MenuForm(self, (self.block_num, self.user))
             self.menu_form.show()
             self.close()
 
@@ -56,21 +62,41 @@ class StartWindow(MainWindow):
                 raise TypeError("Номер комнаты должен быть числом, арабскими цифрами.")
             elif not 200 < int(self.block_num) < 600:
                 raise ValueError("В таком блоке не живут ученики!")
+            elif self.user == '':
+                raise ValueError("Вы не ввели свое имя!")
             elif self.user_not_in_base(self.user):
-                raise UserWarning("Такого ученика нет в базе")
+                raise UserWarning("Такого ученика нет в базе!")
+            elif self.user_not_in_block(self.block_num, self.user):
+                raise UserWarning("Вы не живете в этом блоке!")
             return True
         except Exception as e:
             self.statusBar().showMessage(e.args[0])
             return False
 
     def user_not_in_base(self, user):
-        return False
+        self.con = sqlite3.connect("sesc_base.sqlite")
+        self.cur = self.con.cursor()
+        result = self.cur.execute("SELECT * FROM students")
+        for elem in result:
+            if elem[1] == user:
+                return False
+        return True
+
+    def user_not_in_block(self, block_num, user):
+        self.con = sqlite3.connect("sesc_base.sqlite")
+        self.cur = self.con.cursor()
+        result = self.cur.execute("SELECT * FROM students")
+        for elem in result:
+            if elem[1] == user and elem[2] == int(block_num):
+                return False
+        return True
 
 
 class MenuForm(MainWindow):
-    def __init__(self, parent):
+    def __init__(self, parent, info):
         super().__init__()
         self.parent = parent
+        self.info = info
         uic.loadUi('menu.ui', self)
         self.setFixedSize(self.size())
         self.move2RightBottomCorner(self)
@@ -87,40 +113,22 @@ class MenuForm(MainWindow):
         sender = self.sender().objectName()
         self.close()
         if sender == 'washing_button':
-            self.open_form = WashingList(self)
+            self.open_form = WashingList(self, self.info)
         elif sender == 'worker_button':
-            self.open_form = WorkerList(self)
+            self.open_form = WorkerList(self, self.info)
         elif sender == 'plumbing_button':
-            self.open_form = PlumbingList(self)
+            self.open_form = PlumbingList(self, self.info)
         self.open_form.show()
 
 
-class WorkerList(MainWindow):
-    def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-        uic.loadUi('worker.ui', self)
-        self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
-        self.exit_button.clicked.connect(self.exit)
-
-    def initUI(self):
-        self.setGeometry(300, 300, 300, 300)
-        self.setWindowTitle('Выбор записи')
-
-
-class PlumbingList(MainWindow):
-    def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-        uic.loadUi('plumber.ui', self)
-        self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
-        self.exit_button.clicked.connect(self.exit)
-        self.fill_table()
-        self.send_button.clicked.connect(self.save_results)
-        self.table.itemChanged.connect(self.item_changed)
-        self.create_button.clicked.connect(self.create_row)
+class WorkWithBase(MainWindow):
+    def create_row(self):
+        if self.modified == {} and self.table.item(self.table.rowCount() - 1, 2).text() != '':
+            self.cur.execute(f"insert into {self.args['table']}(Жалоба, №_блока) values('', '')")
+            self.con.commit()
+            self.fill_table()
+        else:
+            self.statusBar().showMessage("Прошлая жалоба еще не отправлена!")
 
     def fill_table(self):
         self.table.clear()
@@ -128,8 +136,10 @@ class PlumbingList(MainWindow):
         self.modified = {}
         self.titles = None
         self.cur = self.con.cursor()
-        self.result = self.cur.execute("SELECT * FROM plumbing WHERE plumbid > (SELECT max(plumbid) - 100 "
-                                  "FROM plumbing)").fetchall()
+        args = self.args
+        self.result = self.cur.execute(f"SELECT * FROM {args['table']} WHERE {args['id_name']} > "
+                                       f"(SELECT max({args['id_name']}) - 40 FROM {args['table']})")
+        self.result = self.result.fetchall()
         self.table.setRowCount(len(self.result))
         self.table.setColumnCount(len(self.result[0]))
         self.table.setVerticalHeaderLabels([''] * len(self.result))
@@ -139,10 +149,11 @@ class PlumbingList(MainWindow):
             for j, val in enumerate(elem):
                 self.table.setItem(i, j, QTableWidgetItem(str(val)))
         if self.result[-1][1] == '':
-            self.unfreeze(len(self.result) - 1)
+            self.unfreeze_row(len(self.result) - 1)
         else:
-            self.unfreeze(-1)
-    def unfreeze(self, a):
+            self.unfreeze_row(-1)
+
+    def unfreeze_row(self, a):
         rows = len(self.result)
         cols = len(self.result[0])
         for row in range(rows):
@@ -153,41 +164,107 @@ class PlumbingList(MainWindow):
                 self.table.setItem(row, col, item)
 
     def save_results(self):
-        if self.modified:
-            que = "UPDATE plumbing SET\n"
-            que += ", ".join([f"{key}='{self.modified[key]}'"
-                              for key in set(self.modified.keys()) - {"id"}])
-            que += f"WHERE plumbid = {self.modified['id']}"
-            self.cur.execute(que)
-            self.con.commit()
-            self.modified.clear()
-            self.fill_table()
+        self.statusBar().clearMessage()
+        try:
+            if "Жалоба" not in self.modified or self.modified["Жалоба"] == '':
+                raise ValueError("Вы не написали жалобу!")
+            elif "№_блока" not in self.modified or self.modified["№_блока"] != str(self.block_num):
+                raise ValueError("Необходимо ввести номер своего блока!")
+            if self.modified:
+                que = f"UPDATE {self.args['base']} SET\n"
+                que += ", ".join([f"{key}='{self.modified[key]}'"
+                                  for key in set(self.modified.keys()) - {"id"}])
+                que += f"WHERE {self.args['id_name']} = {self.modified['id']}"
+                self.cur.execute(que)
+                self.con.commit()
+                self.modified = {}
+                self.fill_table()
+                self.statusBar().showMessage("Отправлено!")
+        except Exception as e:
+            self.statusBar().showMessage(e.args[0])
 
     def item_changed(self, item):
         self.modified[self.titles[item.column()]] = item.text()
         self.modified["id"] = self.result[item.row()][0]
 
-    def create_row(self):
-        self.cur.execute("insert into plumbing(Жалоба, №_блока) values('', '')")
-        self.con.commit()
-        self.fill_table()
 
-    def initUI(self):
-        self.setWindowTitle('Тетрадь для жалоб')
-
-
-class WashingList(StartWindow):
-    def __init__(self, parent):
+class WorkerList(WorkWithBase):
+    def __init__(self, parent, info):
         super().__init__()
         self.parent = parent
+        self.block_num = info[0]
         uic.loadUi('worker.ui', self)
+        self.setWindowTitle('Тетрадь для жалоб, плотническая')
         self.setFixedSize(self.size())
         self.move2RightBottomCorner(self)
         self.exit_button.clicked.connect(self.exit)
+        self.args = {"table": "working", "id_name": "workid"}
+        self.fill_table()
+        self.send_button.clicked.connect(self.save_results)
+        self.table.itemChanged.connect(self.item_changed)
+        self.create_button.clicked.connect(self.create_row)
 
-    def initUI(self):
-        self.setGeometry(300, 300, 300, 300)
-        self.setWindowTitle('Выбор записи')
+
+class PlumbingList(WorkWithBase):
+    def __init__(self, parent, info):
+        super().__init__()
+        self.parent = parent
+        self.block_num = info[0]
+        uic.loadUi('plumber.ui', self)
+        self.setWindowTitle('Тетрадь для жалоб, сантехническая')
+        self.setFixedSize(self.size())
+        self.move2RightBottomCorner(self)
+        self.exit_button.clicked.connect(self.exit)
+        self.args = {"table": "plumbing", "id_name": "plumbid"}
+        self.fill_table()
+        self.send_button.clicked.connect(self.save_results)
+        self.table.itemChanged.connect(self.item_changed)
+        self.create_button.clicked.connect(self.create_row)
+
+
+class WashingList(WorkWithBase):
+    def __init__(self, parent, info):
+        super().__init__()
+        self.parent = parent
+        self.block_num = info[0]
+        uic.loadUi('washer.ui', self)
+        self.setWindowTitle('Тетрадь для записей на стирку')
+        self.setFixedSize(self.size())
+        self.move2RightBottomCorner(self)
+        self.exit_button.clicked.connect(self.exit)
+        self.args = {"table": "washing", "id_name": "washid"}
+        self.fill_table()
+        self.send_button.clicked.connect(self.save_results)
+        self.table.itemChanged.connect(self.item_changed)
+        self.create_button.clicked.connect(self.create_row)
+        self.open_calender.clicked.connect(self.open_calend)
+        self.update_button.clicked.connect(self.date_update)
+
+    def open_calend(self):
+        self.calend = Calender(self)
+        self.calend.show()
+
+    def date_back(self, date):
+        self.date = date
+        self.wash_date.setDate(QDate(*self.date))
+
+    def date_update(self):
+        pass
+
+
+class Calender(QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        uic.loadUi('calender.ui', self)
+        self.parent = parent
+        self.setWindowTitle('Выберите дату')
+        self.set_date_button.clicked.connect(self.func)
+
+    def func(self):
+        self.date = self.calender.selectedDate().getDate()
+        self.parent.date_back(self.date)
+        self.close()
+
 
 
 def exept(a, b, c):
@@ -196,7 +273,7 @@ def exept(a, b, c):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = PlumbingList(StartWindow())
+    ex = StartWindow()
     ex.show()
     sys.excepthook = exept
     sys.exit(app.exec_())
