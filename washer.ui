@@ -53,7 +53,7 @@
    <property name="geometry">
     <rect>
      <x>70</x>
-     <y>230</y>
+     <y>260</y>
      <width>171</width>
      <height>31</height>
     </rect>
@@ -96,7 +96,7 @@
    <property name="geometry">
     <rect>
      <x>290</x>
-     <y>230</y>
+     <y>260</y>
      <width>61</width>
      <height>31</height>
     </rect>
@@ -106,6 +106,12 @@
      <pointsize>10</pointsize>
     </font>
    </property>
+   <property name="minimum">
+    <number>1</number>
+   </property>
+   <property name="maximum">
+    <number>4</number>
+   </property>
    <property name="value">
     <number>1</number>
    </property>
@@ -114,7 +120,7 @@
    <property name="geometry">
     <rect>
      <x>60</x>
-     <y>280</y>
+     <y>200</y>
      <width>301</width>
      <height>31</height>
     </rect>
@@ -145,8 +151,8 @@
    <property name="geometry">
     <rect>
      <x>60</x>
-     <y>470</y>
-     <width>301</width>
+     <y>370</y>
+     <width>291</width>
      <height>28</height>
     </rect>
    </property>
@@ -180,17 +186,59 @@
     <string>Выйти</string>
    </property>
   </widget>
+  <widget class="QLabel" name="label_4">
+   <property name="geometry">
+    <rect>
+     <x>70</x>
+     <y>320</y>
+     <width>151</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Выбранное время:</string>
+   </property>
+  </widget>
+  <widget class="QTimeEdit" name="time">
+   <property name="geometry">
+    <rect>
+     <x>240</x>
+     <y>320</y>
+     <width>111</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="maximumTime">
+    <time>
+     <hour>20</hour>
+     <minute>0</minute>
+     <second>0</second>
+    </time>
+   </property>
+   <property name="minimumTime">
+    <time>
+     <hour>9</hour>
+     <minute>0</minute>
+     <second>0</second>
+    </time>
+   </property>
+  </widget>
   <widget class="QPushButton" name="update_button">
    <property name="geometry">
     <rect>
      <x>60</x>
-     <y>380</y>
-     <width>301</width>
+     <y>420</y>
+     <width>291</width>
      <height>28</height>
     </rect>
    </property>
    <property name="text">
-    <string>Обновить таблицу</string>
+    <string>Заполнить запись</string>
    </property>
   </widget>
  </widget>

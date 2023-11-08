@@ -4,10 +4,12 @@ import sys
 import PyQt5
 from PyQt5 import uic
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QTableWidget, QWidget, QCalendarWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QTableWidget, QWidget, QDateEdit
 
 
 class MainWindow(QMainWindow):
+    con = sqlite3.connect("sesc_base.sqlite")
+    cur = con.cursor()
     def move2RightBottomCorner(self, win):
         screen_geometry = QApplication.desktop().availableGeometry()
         screen_size = (screen_geometry.width(), screen_geometry.height())
@@ -38,7 +40,6 @@ class StartWindow(MainWindow):
         self.setStatusBar(self.statusbar)
         self.user_name.setPlaceholderText("Иванов Иван")
         self.room_number.setPlaceholderText("222")
-
         self.clear()
 
         self.user_name.setText("Сивец Данил")
@@ -74,8 +75,6 @@ class StartWindow(MainWindow):
             return False
 
     def user_not_in_base(self, user):
-        self.con = sqlite3.connect("sesc_base.sqlite")
-        self.cur = self.con.cursor()
         result = self.cur.execute("SELECT * FROM students")
         for elem in result:
             if elem[1] == user:
@@ -83,8 +82,6 @@ class StartWindow(MainWindow):
         return True
 
     def user_not_in_block(self, block_num, user):
-        self.con = sqlite3.connect("sesc_base.sqlite")
-        self.cur = self.con.cursor()
         result = self.cur.execute("SELECT * FROM students")
         for elem in result:
             if elem[1] == user and elem[2] == int(block_num):
@@ -93,6 +90,7 @@ class StartWindow(MainWindow):
 
 
 class MenuForm(MainWindow):
+
     def __init__(self, parent, info):
         super().__init__()
         self.parent = parent
@@ -132,10 +130,8 @@ class WorkWithBase(MainWindow):
 
     def fill_table(self):
         self.table.clear()
-        self.con = sqlite3.connect("sesc_base.sqlite")
         self.modified = {}
         self.titles = None
-        self.cur = self.con.cursor()
         args = self.args
         self.result = self.cur.execute(f"SELECT * FROM {args['table']} WHERE {args['id_name']} > "
                                        f"(SELECT max({args['id_name']}) - 40 FROM {args['table']})")
@@ -143,7 +139,11 @@ class WorkWithBase(MainWindow):
         self.table.setRowCount(len(self.result))
         self.table.setColumnCount(len(self.result[0]))
         self.table.setVerticalHeaderLabels([''] * len(self.result))
-        self.table.setHorizontalHeaderLabels(['Номер жалобы', 'Жалоба', '№_блока', 'Задача прията', 'Выполнено'])
+        res = self.result
+        self.result = []
+        for elem in res:
+            self.result.append((elem[1], elem[3], elem[4], elem[2], elem[0]))
+        self.table.setHorizontalHeaderLabels(['№_Стиралки', 'Время', 'ФИ', "Дата", '№_Стирки'])
         self.titles = [description[0] for description in self.cur.description]
         for i, elem in enumerate(self.result):
             for j, val in enumerate(elem):
@@ -152,14 +152,15 @@ class WorkWithBase(MainWindow):
             self.unfreeze_row(len(self.result) - 1)
         else:
             self.unfreeze_row(-1)
+        self.statusBar().clearMessage()
 
-    def unfreeze_row(self, a):
+    def unfreeze_row(self, num, exep=[1, 2]):
         rows = len(self.result)
         cols = len(self.result[0])
         for row in range(rows):
             for col in range(cols):
                 item = self.table.item(row, col)
-                if row != a or (col != 2 and col != 1):
+                if row != num or (col not in exep):
                     item.setFlags(PyQt5.QtCore.Qt.ItemIsEnabled)
                 self.table.setItem(row, col, item)
 
@@ -171,7 +172,7 @@ class WorkWithBase(MainWindow):
             elif "№_блока" not in self.modified or self.modified["№_блока"] != str(self.block_num):
                 raise ValueError("Необходимо ввести номер своего блока!")
             if self.modified:
-                que = f"UPDATE {self.args['base']} SET\n"
+                que = f"UPDATE {self.args['table']} SET\n"
                 que += ", ".join([f"{key}='{self.modified[key]}'"
                                   for key in set(self.modified.keys()) - {"id"}])
                 que += f"WHERE {self.args['id_name']} = {self.modified['id']}"
@@ -227,6 +228,7 @@ class WashingList(WorkWithBase):
         super().__init__()
         self.parent = parent
         self.block_num = info[0]
+        self.user_name = info[1]
         uic.loadUi('washer.ui', self)
         self.setWindowTitle('Тетрадь для записей на стирку')
         self.setFixedSize(self.size())
@@ -234,11 +236,15 @@ class WashingList(WorkWithBase):
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "washing", "id_name": "washid"}
         self.fill_table()
-        self.send_button.clicked.connect(self.save_results)
+        self.update_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
         self.create_button.clicked.connect(self.create_row)
         self.open_calender.clicked.connect(self.open_calend)
-        self.update_button.clicked.connect(self.date_update)
+        self.unfreeze_row(-1, [])
+        self.row_created = False
+        self.wash_date.dateChanged.connect(self.fill_table)
+        self.mashin_num.textChanged.connect(self.fill_table)
+
 
     def open_calend(self):
         self.calend = Calender(self)
@@ -248,8 +254,66 @@ class WashingList(WorkWithBase):
         self.date = date
         self.wash_date.setDate(QDate(*self.date))
 
-    def date_update(self):
-        pass
+    def create_row(self):
+        if not self.row_created:
+            self.row_created = True
+            if self.modified == {} and self.table.item(self.table.rowCount() - 1, 2).text() != '':
+                self.cur.execute(
+                    f"insert into washing(ФИ, №_стиралки, День, Время) "
+                    f"values('{'_'.join(self.user_name.split())}', '{self.mashin_num.text()}', "
+                    f"'{self.wash_date.text()}', '{self.time.text()}')")
+                self.con.commit()
+                self.fill_table()
+            else:
+                self.statusBar().showMessage("Прошлая запись еще не загружена!")
+        else:
+            self.statusBar().showMessage("По одной записи в день!")
+
+    def save_results(self):
+        if self.row_created:
+            self.modified = {'ФИ': '_'.join(self.user_name.split()), '№_стиралки': self.mashin_num.text(),
+                             'День': self.wash_date.text(), 'Время': self.time.text()}
+            que = "UPDATE washing SET\n"
+            que += ", ".join([f"{key}='{self.modified.get(key)}'"
+                              for key in self.modified.keys()])
+            que += f"WHERE washid = {self.table.item(self.table.rowCount() - 1, 4).text()}"
+            self.cur.execute(que)
+            self.con.commit()
+            self.modified.clear()
+            self.fill_table()
+        else:
+            self.statusBar().showMessage("Сперва создайте запись!")
+
+    def fill_table(self):
+        self.table.clear()
+        self.modified = {}
+        self.titles = None
+        date = self.wash_date.text()
+        num = self.mashin_num.text()
+        self.result = self.cur.execute(f"SELECT * FROM washing WHERE №_стиралки='{num}' and День='{date}'")
+        self.result = self.result.fetchall()
+        if not self.result:
+            self.result = tuple([['-' for _ in range(5)]])
+        self.table.setRowCount(len(self.result))
+        self.table.setColumnCount(len(self.result[0]))
+        self.table.setVerticalHeaderLabels([''] * len(self.result))
+        res = self.result
+        self.result = []
+        for elem in res:
+            self.result.append((elem[1], elem[3], elem[4], elem[2], elem[0]))
+        self.table.setHorizontalHeaderLabels(['№_Стиралки', 'Время', 'ФИ', "Дата", '№_Стирки'])
+        self.titles = [description[0] for description in self.cur.description]
+        for i, elem in enumerate(self.result):
+            for j, val in enumerate(elem):
+                self.table.setItem(i, j, QTableWidgetItem(str(val)))
+        if self.result[-1][1] == '':
+            self.unfreeze_row(len(self.result) - 1)
+        else:
+            self.unfreeze_row(-1)
+        self.statusBar().clearMessage()
+
+
+
 
 
 class Calender(QWidget):
@@ -264,6 +328,8 @@ class Calender(QWidget):
         self.date = self.calender.selectedDate().getDate()
         self.parent.date_back(self.date)
         self.close()
+
+
 
 
 
