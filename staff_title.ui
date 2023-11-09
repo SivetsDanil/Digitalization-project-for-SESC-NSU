@@ -41,7 +41,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QLineEdit" name="lineEdit_2">
+  <widget class="QLineEdit" name="pass_line">
    <property name="geometry">
     <rect>
      <x>320</x>
@@ -85,6 +85,32 @@
    </property>
    <property name="text">
     <string>Пароль сотрудника:</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="exit_button">
+   <property name="geometry">
+    <rect>
+     <x>632</x>
+     <y>390</y>
+     <width>111</width>
+     <height>28</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Выход</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="log_in_button">
+   <property name="geometry">
+    <rect>
+     <x>320</x>
+     <y>320</y>
+     <width>151</width>
+     <height>28</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Войти</string>
    </property>
   </widget>
  </widget>

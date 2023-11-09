@@ -101,7 +101,7 @@
      <string>№ блока</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton">
+   <widget class="QPushButton" name="staff_log_in_button">
     <property name="geometry">
      <rect>
       <x>502</x>

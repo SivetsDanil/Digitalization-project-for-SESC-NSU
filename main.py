@@ -4,7 +4,8 @@ import sys
 import PyQt5
 from PyQt5 import uic
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QTableWidget, QWidget, QDateEdit
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QTableWidget, QWidget, QDateEdit, \
+    QTimeEdit
 
 
 class MainWindow(QMainWindow):
@@ -40,6 +41,7 @@ class StartWindow(MainWindow):
         self.setStatusBar(self.statusbar)
         self.user_name.setPlaceholderText("Иванов Иван")
         self.room_number.setPlaceholderText("222")
+        self.staff_log_in_button.clicked.connect(self.staff_log_in)
         self.clear()
 
         self.user_name.setText("Сивец Данил")
@@ -87,6 +89,11 @@ class StartWindow(MainWindow):
             if elem[1] == user and elem[2] == int(block_num):
                 return False
         return True
+
+    def staff_log_in(self):
+        self.open_form = StaffTitle(self)
+        self.close()
+        self.open_form.show()
 
 
 class MenuForm(MainWindow):
@@ -139,11 +146,7 @@ class WorkWithBase(MainWindow):
         self.table.setRowCount(len(self.result))
         self.table.setColumnCount(len(self.result[0]))
         self.table.setVerticalHeaderLabels([''] * len(self.result))
-        res = self.result
-        self.result = []
-        for elem in res:
-            self.result.append((elem[1], elem[3], elem[4], elem[2], elem[0]))
-        self.table.setHorizontalHeaderLabels(['№_Стиралки', 'Время', 'ФИ', "Дата", '№_Стирки'])
+        self.table.setHorizontalHeaderLabels(['Номер жалобы', 'Жалоба', '№_блока', 'Задача прията', 'Выполнено'])
         self.titles = [description[0] for description in self.cur.description]
         for i, elem in enumerate(self.result):
             for j, val in enumerate(elem):
@@ -194,7 +197,7 @@ class WorkerList(WorkWithBase):
         super().__init__()
         self.parent = parent
         self.block_num = info[0]
-        uic.loadUi('worker.ui', self)
+        uic.loadUi('work_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, плотническая')
         self.setFixedSize(self.size())
         self.move2RightBottomCorner(self)
@@ -211,7 +214,7 @@ class PlumbingList(WorkWithBase):
         super().__init__()
         self.parent = parent
         self.block_num = info[0]
-        uic.loadUi('plumber.ui', self)
+        uic.loadUi('plumb_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, сантехническая')
         self.setFixedSize(self.size())
         self.move2RightBottomCorner(self)
@@ -229,7 +232,8 @@ class WashingList(WorkWithBase):
         self.parent = parent
         self.block_num = info[0]
         self.user_name = info[1]
-        uic.loadUi('washer.ui', self)
+        uic.loadUi('wash_table.ui', self)
+        self.row_created = False
         self.setWindowTitle('Тетрадь для записей на стирку')
         self.setFixedSize(self.size())
         self.move2RightBottomCorner(self)
@@ -241,9 +245,9 @@ class WashingList(WorkWithBase):
         self.create_button.clicked.connect(self.create_row)
         self.open_calender.clicked.connect(self.open_calend)
         self.unfreeze_row(-1, [])
-        self.row_created = False
         self.wash_date.dateChanged.connect(self.fill_table)
         self.mashin_num.textChanged.connect(self.fill_table)
+        self.row_id = -1
 
 
     def open_calend(self):
@@ -255,36 +259,56 @@ class WashingList(WorkWithBase):
         self.wash_date.setDate(QDate(*self.date))
 
     def create_row(self):
-        if not self.row_created:
+        if not self.row_created and self.time_is_free():
             self.row_created = True
-            if self.modified == {} and self.table.item(self.table.rowCount() - 1, 2).text() != '':
-                self.cur.execute(
-                    f"insert into washing(ФИ, №_стиралки, День, Время) "
-                    f"values('{'_'.join(self.user_name.split())}', '{self.mashin_num.text()}', "
-                    f"'{self.wash_date.text()}', '{self.time.text()}')")
-                self.con.commit()
-                self.fill_table()
-            else:
-                self.statusBar().showMessage("Прошлая запись еще не загружена!")
+            print(3)
+            self.cur.execute(
+                f"insert into washing(ФИ, №_стиралки, День, Время) "
+                f"values('{'_'.join(self.user_name.split())}', '{self.mashin_num.text()}', "
+                f"'{self.wash_date.text()}', '{self.time.text()}')")
+            self.con.commit()
+            self.fill_table()
+            self.row_id = self.cur.execute(f"select washid from washing where "
+                                           f"ФИ='{'_'.join(self.user_name.split())}' and"
+                                           f" №_стиралки='{self.mashin_num.text()}' and "
+                                           f"День='{self.wash_date.text()}' and "
+                                           f"Время='{self.time.text()}'").fetchall()[0][0]
+        elif not self.time_is_free():
+            self.statusBar().showMessage("Это время уже занято!")
         else:
             self.statusBar().showMessage("По одной записи в день!")
 
     def save_results(self):
-        if self.row_created:
-            self.modified = {'ФИ': '_'.join(self.user_name.split()), '№_стиралки': self.mashin_num.text(),
-                             'День': self.wash_date.text(), 'Время': self.time.text()}
-            que = "UPDATE washing SET\n"
-            que += ", ".join([f"{key}='{self.modified.get(key)}'"
-                              for key in self.modified.keys()])
-            que += f"WHERE washid = {self.table.item(self.table.rowCount() - 1, 4).text()}"
-            self.cur.execute(que)
-            self.con.commit()
-            self.modified.clear()
-            self.fill_table()
-        else:
+        try:
+            if self.row_created and self.time_is_free() and self.time.text().split(":")[1] == '00':
+                self.modified = {'ФИ': '_'.join(self.user_name.split()), '№_стиралки': self.mashin_num.text(),
+                                 'День': self.wash_date.text(), 'Время': self.time.text()}
+                que = "UPDATE washing SET\n"
+                que += ", ".join([f"{key}='{self.modified.get(key)}'"
+                                  for key in self.modified.keys()])
+                que += f"WHERE washid = {self.row_id}"
+                self.cur.execute(que)
+                self.con.commit()
+                self.modified.clear()
+                self.fill_table()
+            elif not self.row_created:
+                self.statusBar().showMessage("Сперва создайте запись!")
+            elif not self.time_is_free():
+                self.statusBar().showMessage("Это время занято!")
+            elif self.time.text().split(":")[1] != '00':
+                self.statusBar().showMessage("Необходимо выбрать время без минут!")
+        except Exception:
             self.statusBar().showMessage("Сперва создайте запись!")
 
+    def time_is_free(self):
+        result = self.cur.execute(f"SELECT * FROM washing WHERE №_стиралки='{self.mashin_num.text()}'")
+        for elem in result:
+            if elem[3] == self.time.text():
+                return False
+        return True
+
     def fill_table(self):
+
         self.table.clear()
         self.modified = {}
         self.titles = None
@@ -292,6 +316,8 @@ class WashingList(WorkWithBase):
         num = self.mashin_num.text()
         self.result = self.cur.execute(f"SELECT * FROM washing WHERE №_стиралки='{num}' and День='{date}'")
         self.result = self.result.fetchall()
+        if not self.row_created:
+            self.result.sort(key=lambda x: int(x[3].split(":")[0]))
         if not self.result:
             self.result = tuple([['-' for _ in range(5)]])
         self.table.setRowCount(len(self.result))
@@ -313,9 +339,6 @@ class WashingList(WorkWithBase):
         self.statusBar().clearMessage()
 
 
-
-
-
 class Calender(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -329,6 +352,83 @@ class Calender(QWidget):
         self.parent.date_back(self.date)
         self.close()
 
+
+class StaffTitle(MainWindow):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        uic.loadUi('staff_title.ui', self)
+        self.setFixedSize(self.size())
+        self.move2RightBottomCorner(self)
+        self.log_in_button.clicked.connect(self.log_in)
+        self.exit_button.clicked.connect(self.exit)
+
+        self.staff_name.setText("admin")
+        self.pass_line.setText("admin")
+
+    def log_in(self):
+        self.user_name = self.staff_name.text()
+        self.password = self.pass_line.text()
+        self.statusBar().clearMessage()
+        if self.check_log_in():
+            self.post = self.get_post()
+            if self.post == 'admin':
+                self.open_form = AdminSpace(self)
+            elif self.post == 'plumber':
+                self.open_form = PlumberSpace(self)
+            elif self.post == 'worker':
+                self.open_form = WorkerSpace(self)
+            else:
+                self.statusBar().showMessage("Ваша должность некорректна, обратитесь к админестратору")
+            self.open_form.show()
+            self.close()
+
+    def check_log_in(self):
+        self.statusBar().clearMessage()
+        try:
+            if self.user_name == '':
+                raise ValueError("Вы не ввели свое ФИО")
+            elif self.emp_not_in_base():
+                raise UserWarning("Такого ФИО нет в базе")
+            elif not self.check_pass():
+                raise UserWarning("Неверный пароль")
+            return True
+        except Exception as e:
+            self.statusBar().showMessage(e.args[0])
+            return False
+
+    def emp_not_in_base(self):
+        result = self.cur.execute(f"SELECT name FROM employers WHERE name='{self.user_name}'").fetchall()
+        if result:
+            return False
+        return True
+
+    def check_pass(self):
+        result = self.cur.execute(f"SELECT password FROM employers WHERE name='{self.user_name}'").fetchall()
+        if result[0][0] == self.password:
+            return True
+        return False
+
+    def get_post(self):
+        return self.cur.execute(f"SELECT post FROM employers WHERE name='{self.user_name}'").fetchall()[0][0]
+
+
+class AdminSpace(WorkWithBase):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        uic.loadUi('admin.ui', self)
+        self.setFixedSize(self.size())
+        self.move2RightBottomCorner(self)
+        self.exit_button.clicked.connect(self.exit)
+
+
+class PlumberSpace(WorkWithBase):
+    pass
+
+
+class WorkerSpace(WorkWithBase):
+    pass
 
 
 
