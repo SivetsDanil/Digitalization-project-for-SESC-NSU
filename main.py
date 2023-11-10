@@ -4,14 +4,14 @@ import sys
 import PyQt5
 from PyQt5 import uic
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QTableWidget, QWidget, QDateEdit, \
-    QTimeEdit
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget, QComboBox, QPushButton
 
 
 class MainWindow(QMainWindow):
     con = sqlite3.connect("sesc_base.sqlite")
     cur = con.cursor()
-    def move2RightBottomCorner(self, win):
+
+    def moveCenter(self, win):
         screen_geometry = QApplication.desktop().availableGeometry()
         screen_size = (screen_geometry.width(), screen_geometry.height())
         win_size = (win.frameSize().width(), win.frameSize().height())
@@ -33,7 +33,7 @@ class StartWindow(MainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi('title.ui', self)
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.setFixedSize(self.size())
         self.log_in_button.clicked.connect(self.log_in)
         self.statusbar = QStatusBar(self)
@@ -46,8 +46,6 @@ class StartWindow(MainWindow):
 
         self.user_name.setText("Сивец Данил")
         self.room_number.setText("236")
-
-
 
     def log_in(self):
         self.block_num = self.room_number.text()
@@ -104,7 +102,7 @@ class MenuForm(MainWindow):
         self.info = info
         uic.loadUi('menu.ui', self)
         self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.washing_button.clicked.connect(self.start_work)
         self.worker_button.clicked.connect(self.start_work)
@@ -129,13 +127,19 @@ class MenuForm(MainWindow):
 class WorkWithBase(MainWindow):
     def create_row(self):
         if self.modified == {} and self.table.item(self.table.rowCount() - 1, 2).text() != '':
-            self.cur.execute(f"insert into {self.args['table']}(Жалоба, №_блока) values('', '')")
+            self.cur.execute(f"insert into {self.args['table']}(report, block_num) values('', '')")
             self.con.commit()
             self.fill_table()
+            self.row_id = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where "
+                                           f"report='' and block_num=''").fetchall()[0][0]
         else:
             self.statusBar().showMessage("Прошлая жалоба еще не отправлена!")
 
-    def fill_table(self):
+    def fill_table(self, a=[]):
+        if a:
+            header = a
+        else:
+            header = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
         self.table.clear()
         self.modified = {}
         self.titles = None
@@ -146,7 +150,7 @@ class WorkWithBase(MainWindow):
         self.table.setRowCount(len(self.result))
         self.table.setColumnCount(len(self.result[0]))
         self.table.setVerticalHeaderLabels([''] * len(self.result))
-        self.table.setHorizontalHeaderLabels(['Номер жалобы', 'Жалоба', '№_блока', 'Задача прията', 'Выполнено'])
+        self.table.setHorizontalHeaderLabels(header)
         self.titles = [description[0] for description in self.cur.description]
         for i, elem in enumerate(self.result):
             for j, val in enumerate(elem):
@@ -170,9 +174,9 @@ class WorkWithBase(MainWindow):
     def save_results(self):
         self.statusBar().clearMessage()
         try:
-            if "Жалоба" not in self.modified or self.modified["Жалоба"] == '':
+            if "report" not in self.modified or self.modified["report"] == '':
                 raise ValueError("Вы не написали жалобу!")
-            elif "№_блока" not in self.modified or self.modified["№_блока"] != str(self.block_num):
+            elif "block_num" not in self.modified or self.modified["block_num"] != str(self.block_num):
                 raise ValueError("Необходимо ввести номер своего блока!")
             if self.modified:
                 que = f"UPDATE {self.args['table']} SET\n"
@@ -188,8 +192,11 @@ class WorkWithBase(MainWindow):
             self.statusBar().showMessage(e.args[0])
 
     def item_changed(self, item):
-        self.modified[self.titles[item.column()]] = item.text()
-        self.modified["id"] = self.result[item.row()][0]
+        try:
+            self.modified[self.titles[item.column()]] = item.text()
+            self.modified["id"] = self.row_id
+        except Exception:
+            pass
 
 
 class WorkerList(WorkWithBase):
@@ -200,7 +207,7 @@ class WorkerList(WorkWithBase):
         uic.loadUi('work_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, плотническая')
         self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "working", "id_name": "workid"}
         self.fill_table()
@@ -217,7 +224,7 @@ class PlumbingList(WorkWithBase):
         uic.loadUi('plumb_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, сантехническая')
         self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "plumbing", "id_name": "plumbid"}
         self.fill_table()
@@ -236,7 +243,7 @@ class WashingList(WorkWithBase):
         self.row_created = False
         self.setWindowTitle('Тетрадь для записей на стирку')
         self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "washing", "id_name": "washid"}
         self.fill_table()
@@ -248,7 +255,6 @@ class WashingList(WorkWithBase):
         self.wash_date.dateChanged.connect(self.fill_table)
         self.mashin_num.textChanged.connect(self.fill_table)
         self.row_id = -1
-
 
     def open_calend(self):
         self.calend = Calender(self)
@@ -263,16 +269,16 @@ class WashingList(WorkWithBase):
             self.row_created = True
             print(3)
             self.cur.execute(
-                f"insert into washing(ФИ, №_стиралки, День, Время) "
+                f"insert into washing(name, wash_num, day, time) "
                 f"values('{'_'.join(self.user_name.split())}', '{self.mashin_num.text()}', "
                 f"'{self.wash_date.text()}', '{self.time.text()}')")
             self.con.commit()
             self.fill_table()
             self.row_id = self.cur.execute(f"select washid from washing where "
-                                           f"ФИ='{'_'.join(self.user_name.split())}' and"
-                                           f" №_стиралки='{self.mashin_num.text()}' and "
-                                           f"День='{self.wash_date.text()}' and "
-                                           f"Время='{self.time.text()}'").fetchall()[0][0]
+                                           f"name='{'_'.join(self.user_name.split())}' and"
+                                           f" wash_num='{self.mashin_num.text()}' and "
+                                           f"day='{self.wash_date.text()}' and "
+                                           f"time='{self.time.text()}'").fetchall()[0][0]
         elif not self.time_is_free():
             self.statusBar().showMessage("Это время уже занято!")
         else:
@@ -281,8 +287,8 @@ class WashingList(WorkWithBase):
     def save_results(self):
         try:
             if self.row_created and self.time_is_free() and self.time.text().split(":")[1] == '00':
-                self.modified = {'ФИ': '_'.join(self.user_name.split()), '№_стиралки': self.mashin_num.text(),
-                                 'День': self.wash_date.text(), 'Время': self.time.text()}
+                self.modified = {'name': '_'.join(self.user_name.split()), 'wash_num': self.mashin_num.text(),
+                                 'day': self.wash_date.text(), 'time': self.time.text()}
                 que = "UPDATE washing SET\n"
                 que += ", ".join([f"{key}='{self.modified.get(key)}'"
                                   for key in self.modified.keys()])
@@ -301,7 +307,7 @@ class WashingList(WorkWithBase):
             self.statusBar().showMessage("Сперва создайте запись!")
 
     def time_is_free(self):
-        result = self.cur.execute(f"SELECT * FROM washing WHERE №_стиралки='{self.mashin_num.text()}'")
+        result = self.cur.execute(f"SELECT * FROM washing WHERE wash_num='{self.mashin_num.text()}'")
         for elem in result:
             if elem[3] == self.time.text():
                 return False
@@ -314,7 +320,7 @@ class WashingList(WorkWithBase):
         self.titles = None
         date = self.wash_date.text()
         num = self.mashin_num.text()
-        self.result = self.cur.execute(f"SELECT * FROM washing WHERE №_стиралки='{num}' and День='{date}'")
+        self.result = self.cur.execute(f"SELECT * FROM washing WHERE wash_num='{num}' and day='{date}'")
         self.result = self.result.fetchall()
         if not self.row_created:
             self.result.sort(key=lambda x: int(x[3].split(":")[0]))
@@ -358,8 +364,9 @@ class StaffTitle(MainWindow):
         super().__init__()
         self.parent = parent
         uic.loadUi('staff_title.ui', self)
+        self.setWindowTitle('Вход для сотрудников')
         self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.log_in_button.clicked.connect(self.log_in)
         self.exit_button.clicked.connect(self.exit)
 
@@ -418,19 +425,74 @@ class AdminSpace(WorkWithBase):
         super().__init__()
         self.parent = parent
         uic.loadUi('admin.ui', self)
+        self.setWindowTitle('Рабочее место администратора')
         self.setFixedSize(self.size())
-        self.move2RightBottomCorner(self)
+        self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
+        self.table_line.addItems(["students", "employers", "washing", "working", "plumbing"])
+        self.table_line.setCurrentText("students")
+
+
+
+        self.args = {"table": "students", "id_name": "id"}
+        self.columns = ['Номер ученика', 'ФИ', "Номер блока"]
+        self.admin_fill_table()
+
+        self.table_line.currentTextChanged.connect(self.table_changed)
+        self.save_button.clicked.connect(self.save_results)
+        self.table.itemChanged.connect(self.item_changed)
+        self.create_button.clicked.connect(self.create_row)
+        self.delete_button.clicked.connect(self.delete)
+        self.update_button.clicked.connect(self.admin_fill_table)
+
+    def table_changed(self):
+        self.selected_table = self.table_line.currentText()
+        if self.selected_table == "students":
+            self.args = {"table": "students", "id_name": "id"}
+            self.columns = ['Номер ученика', 'ФИ', "Номер блока"]
+        elif self.selected_table == "employers":
+            self.args = {"table": "employers", "id_name": "emp_id"}
+            self.columns = ['Номер сотрудника', 'ФИО', "Должность", "Пароль"]
+        elif self.selected_table == "washing":
+            self.args = {"table": "washing", "id_name": "washid"}
+            self.columns = ['№_Стиралки', 'Время', 'ФИ', "Дата", '№_Стирки']
+        elif self.selected_table == "working":
+            self.args = {"table": "working", "id_name": "workid"}
+            self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+        elif self.selected_table == "plumbing":
+            self.args = {"table": "plumbing", "id_name": "plumbid"}
+            self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+        self.admin_fill_table()
+
+
+    def delete(self):
+        pass
+
+    def admin_fill_table(self):
+        self.fill_table(self.columns)
+
 
 
 class PlumberSpace(WorkWithBase):
-    pass
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        uic.loadUi('plumber.ui', self)
+        self.setWindowTitle('Рабочее место сантехника')
+        self.setFixedSize(self.size())
+        self.moveCenter(self)
+        self.exit_button.clicked.connect(self.exit)
 
 
 class WorkerSpace(WorkWithBase):
-    pass
-
-
+    def __init__(self, parent):
+        self.setWindowTitle('Рабочее место плотника')
+        super().__init__()
+        self.parent = parent
+        uic.loadUi('worker.ui', self)
+        self.setFixedSize(self.size())
+        self.moveCenter(self)
+        self.exit_button.clicked.connect(self.exit)
 
 
 def exept(a, b, c):
