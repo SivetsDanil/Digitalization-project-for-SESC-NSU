@@ -4,7 +4,8 @@ import sys
 import PyQt5
 from PyQt5 import uic
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget, QComboBox, QPushButton
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget,
+                             QComboBox, QPushButton, QTableWidget)
 
 
 class MainWindow(QMainWindow):
@@ -126,16 +127,18 @@ class MenuForm(MainWindow):
 
 class WorkWithBase(MainWindow):
     def create_row(self):
-        if self.modified == {} and self.table.item(self.table.rowCount() - 1, 2).text() != '':
+        if self.row_sent:
             self.cur.execute(f"insert into {self.args['table']}(report, block_num) values('', '')")
             self.con.commit()
             self.fill_table()
             self.row_id = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where "
                                            f"report='' and block_num=''").fetchall()[0][0]
-        else:
+        elif not self.row_sent:
             self.statusBar().showMessage("Прошлая жалоба еще не отправлена!")
 
-    def fill_table(self, a=[]):
+    def fill_table(self, a=None):
+        if a is None:
+            a = []
         if a:
             header = a
         else:
@@ -156,19 +159,30 @@ class WorkWithBase(MainWindow):
             for j, val in enumerate(elem):
                 self.table.setItem(i, j, QTableWidgetItem(str(val)))
         if self.result[-1][1] == '':
-            self.unfreeze_row(len(self.result) - 1)
+            self.freeze_row(len(self.result) - 1)
         else:
-            self.unfreeze_row(-1)
+            self.freeze_row(-1)
         self.statusBar().clearMessage()
 
-    def unfreeze_row(self, num, exep=[1, 2]):
-        rows = len(self.result)
-        cols = len(self.result[0])
+    def freeze_row(self, num, exep=None):
+        if exep is None:
+            exep = [1, 2]
+        rows = self.table.rowCount()
+        cols = self.table.columnCount()
         for row in range(rows):
             for col in range(cols):
                 item = self.table.item(row, col)
                 if row != num or (col not in exep):
                     item.setFlags(PyQt5.QtCore.Qt.ItemIsEnabled)
+                self.table.setItem(row, col, item)
+
+    def unfreeze_table(self):
+        rows = self.table.rowCount()
+        cols = self.table.columnCount()
+        for row in range(rows):
+            for col in range(cols):
+                item = self.table.item(row, col)
+                item.setFlags()
                 self.table.setItem(row, col, item)
 
     def save_results(self):
@@ -186,6 +200,7 @@ class WorkWithBase(MainWindow):
                 self.cur.execute(que)
                 self.con.commit()
                 self.modified = {}
+                self.row_sent = True
                 self.fill_table()
                 self.statusBar().showMessage("Отправлено!")
         except Exception as e:
@@ -203,6 +218,8 @@ class WorkerList(WorkWithBase):
     def __init__(self, parent, info):
         super().__init__()
         self.parent = parent
+        self.row_sent = False
+        self.row_created = False
         self.block_num = info[0]
         uic.loadUi('work_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, плотническая')
@@ -227,6 +244,8 @@ class PlumbingList(WorkWithBase):
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "plumbing", "id_name": "plumbid"}
+        self.row_sent = False
+        self.row_created = False
         self.fill_table()
         self.send_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
@@ -241,6 +260,7 @@ class WashingList(WorkWithBase):
         self.user_name = info[1]
         uic.loadUi('wash_table.ui', self)
         self.row_created = False
+        self.row_sent = False
         self.setWindowTitle('Тетрадь для записей на стирку')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -251,7 +271,7 @@ class WashingList(WorkWithBase):
         self.table.itemChanged.connect(self.item_changed)
         self.create_button.clicked.connect(self.create_row)
         self.open_calender.clicked.connect(self.open_calend)
-        self.unfreeze_row(-1, [])
+        self.freeze_row(-1, [])
         self.wash_date.dateChanged.connect(self.fill_table)
         self.mashin_num.textChanged.connect(self.fill_table)
         self.row_id = -1
@@ -265,7 +285,7 @@ class WashingList(WorkWithBase):
         self.wash_date.setDate(QDate(*self.date))
 
     def create_row(self):
-        if not self.row_created and self.time_is_free():
+        if self.time_is_free():
             self.row_created = True
             print(3)
             self.cur.execute(
@@ -281,8 +301,6 @@ class WashingList(WorkWithBase):
                                            f"time='{self.time.text()}'").fetchall()[0][0]
         elif not self.time_is_free():
             self.statusBar().showMessage("Это время уже занято!")
-        else:
-            self.statusBar().showMessage("По одной записи в день!")
 
     def save_results(self):
         try:
@@ -313,8 +331,7 @@ class WashingList(WorkWithBase):
                 return False
         return True
 
-    def fill_table(self):
-
+    def fill_table(self, **kwargs):
         self.table.clear()
         self.modified = {}
         self.titles = None
@@ -339,9 +356,9 @@ class WashingList(WorkWithBase):
             for j, val in enumerate(elem):
                 self.table.setItem(i, j, QTableWidgetItem(str(val)))
         if self.result[-1][1] == '':
-            self.unfreeze_row(len(self.result) - 1)
+            self.freeze_row(len(self.result) - 1)
         else:
-            self.unfreeze_row(-1)
+            self.freeze_row(-1)
         self.statusBar().clearMessage()
 
 
@@ -432,8 +449,6 @@ class AdminSpace(WorkWithBase):
         self.table_line.addItems(["students", "employers", "washing", "working", "plumbing"])
         self.table_line.setCurrentText("students")
 
-
-
         self.args = {"table": "students", "id_name": "id"}
         self.columns = ['Номер ученика', 'ФИ', "Номер блока"]
         self.admin_fill_table()
@@ -470,7 +485,7 @@ class AdminSpace(WorkWithBase):
 
     def admin_fill_table(self):
         self.fill_table(self.columns)
-
+        self.table.setEnabled(True)
 
 
 class PlumberSpace(WorkWithBase):
