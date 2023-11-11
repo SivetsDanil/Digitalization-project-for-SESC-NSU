@@ -130,6 +130,7 @@ class WorkWithBase(MainWindow):
         if self.row_sent and not self.row_created:
             self.row_created = True
             self.row_sent = False
+            self.modified = {}
             self.cur.execute(f"insert into {self.args['table']}(report, block_num) values('', '')")
             self.con.commit()
             self.fill_table()
@@ -137,20 +138,19 @@ class WorkWithBase(MainWindow):
                                            f"report='' and block_num=''").fetchall()[0][0]
         elif not self.row_sent:
             self.statusBar().showMessage("Прошлая жалоба еще не отправлена!")
+        elif self.row_created:
+            self.statusBar().showMessage("По одной записи в день!")
 
-    def fill_table(self, a=None):
-        if a is None:
-            a = []
-        if a:
-            header = a
-        else:
+    def fill_table(self, head=None):
+        if head is None:
             header = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+        else:
+            header = head
         self.table.clear()
         self.modified = {}
         self.titles = None
-        args = self.args
-        self.result = self.cur.execute(f"SELECT * FROM {args['table']} WHERE {args['id_name']} > "
-                                       f"(SELECT max({args['id_name']}) - 40 FROM {args['table']})")
+        self.result = self.cur.execute(f"SELECT * FROM {self.args['table']} WHERE {self.args['id_name']} > "
+                                       f"(SELECT max({self.args['id_name']}) - 40 FROM {self.args['table']})")
         self.result = self.result.fetchall()
         self.table.setRowCount(len(self.result))
         self.table.setColumnCount(len(self.result[0]))
@@ -184,17 +184,19 @@ class WorkWithBase(MainWindow):
         for row in range(rows):
             for col in range(cols):
                 item = self.table.item(row, col)
-                item.setFlags(PyQt5.QtCore.Qt.ItemIsEditable | PyQt5.QtCore.Qt.ItemIsSelectable | PyQt5.QtCore.Qt.ItemIsEnabled)
+                item.setFlags(PyQt5.QtCore.Qt.ItemIsEditable | PyQt5.QtCore.Qt.ItemIsSelectable
+                              | PyQt5.QtCore.Qt.ItemIsEnabled)
                 self.table.setItem(row, col, item)
 
     def save_results(self):
         self.statusBar().clearMessage()
         try:
+            print(self.modified)
             if "report" not in self.modified or self.modified["report"] == '':
                 raise ValueError("Вы не написали жалобу!")
             elif "block_num" not in self.modified or self.modified["block_num"] != str(self.block_num):
                 raise ValueError("Необходимо ввести номер своего блока!")
-            if self.modified:
+            elif self.modified:
                 que = f"UPDATE {self.args['table']} SET\n"
                 que += ", ".join([f"{key}='{self.modified[key]}'"
                                   for key in set(self.modified.keys()) - {"id"}])
@@ -210,8 +212,9 @@ class WorkWithBase(MainWindow):
 
     def item_changed(self, item):
         try:
-            self.modified[self.titles[item.column()]] = item.text()
-            self.modified["id"] = self.row_id
+            if self.row_created and self.table.item(self.table.rowCount() - 1, 0).text() == self.row_id:
+                self.modified["id"] = self.row_id
+                self.modified[self.titles[item.column()]] = item.text()
         except Exception:
             pass
 
@@ -289,9 +292,8 @@ class WashingList(WorkWithBase):
         self.wash_date.setDate(QDate(*self.date))
 
     def create_row(self):
-        if self.time_is_free():
+        if self.time_is_free() and self.time.text().split(":")[1] == '00':
             self.row_created = True
-            print(3)
             self.cur.execute(
                 f"insert into washing(name, wash_num, day, time) "
                 f"values('{'_'.join(self.user_name.split())}', '{self.mashin_num.text()}', "
@@ -305,6 +307,8 @@ class WashingList(WorkWithBase):
                                            f"time='{self.time.text()}'").fetchall()[0][0]
         elif not self.time_is_free():
             self.statusBar().showMessage("Это время уже занято!")
+        elif self.time.text().split(":")[1] != '00':
+            self.statusBar().showMessage("Необходимо выбрать время без минут!")
 
     def save_results(self):
         try:
@@ -528,8 +532,8 @@ class PlumberSpace(WorkWithBase):
 
 class WorkerSpace(WorkWithBase):
     def __init__(self, parent):
-        self.setWindowTitle('Рабочее место плотника')
         super().__init__()
+        self.setWindowTitle('Рабочее место плотника')
         self.parent = parent
         uic.loadUi('worker.ui', self)
         self.setFixedSize(self.size())
