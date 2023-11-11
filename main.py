@@ -127,7 +127,9 @@ class MenuForm(MainWindow):
 
 class WorkWithBase(MainWindow):
     def create_row(self):
-        if self.row_sent:
+        if self.row_sent and not self.row_created:
+            self.row_created = True
+            self.row_sent = False
             self.cur.execute(f"insert into {self.args['table']}(report, block_num) values('', '')")
             self.con.commit()
             self.fill_table()
@@ -182,7 +184,7 @@ class WorkWithBase(MainWindow):
         for row in range(rows):
             for col in range(cols):
                 item = self.table.item(row, col)
-                item.setFlags()
+                item.setFlags(PyQt5.QtCore.Qt.ItemIsEditable | PyQt5.QtCore.Qt.ItemIsSelectable | PyQt5.QtCore.Qt.ItemIsEnabled)
                 self.table.setItem(row, col, item)
 
     def save_results(self):
@@ -218,7 +220,7 @@ class WorkerList(WorkWithBase):
     def __init__(self, parent, info):
         super().__init__()
         self.parent = parent
-        self.row_sent = False
+        self.row_sent = True
         self.row_created = False
         self.block_num = info[0]
         uic.loadUi('work_table.ui', self)
@@ -244,8 +246,10 @@ class PlumbingList(WorkWithBase):
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "plumbing", "id_name": "plumbid"}
-        self.row_sent = False
+
+        self.row_sent = True
         self.row_created = False
+
         self.fill_table()
         self.send_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
@@ -260,7 +264,7 @@ class WashingList(WorkWithBase):
         self.user_name = info[1]
         uic.loadUi('wash_table.ui', self)
         self.row_created = False
-        self.row_sent = False
+        self.row_sent = True
         self.setWindowTitle('Тетрадь для записей на стирку')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -460,6 +464,11 @@ class AdminSpace(WorkWithBase):
         self.delete_button.clicked.connect(self.delete)
         self.update_button.clicked.connect(self.admin_fill_table)
 
+        self.row_sent = True
+        self.row_created = False
+        self.selected_table = self.table_line.currentText()
+
+
     def table_changed(self):
         self.selected_table = self.table_line.currentText()
         if self.selected_table == "students":
@@ -485,7 +494,25 @@ class AdminSpace(WorkWithBase):
 
     def admin_fill_table(self):
         self.fill_table(self.columns)
+        self.unfreeze_table()
         self.table.setEnabled(True)
+
+    def create_row(self):
+        request = ''
+        if self.selected_table == "students":
+            request = "insert into students(studentName, studentBlock) values('', '')"
+        elif self.selected_table == "employers":
+            request = "insert into employers(name, post, password) values('', '', '')"
+        elif self.selected_table == "washing":
+            request = "insert into washing(name, wash_num, day, time) values('', '', '', '')"
+        elif self.selected_table == "working":
+            request = "insert into working(report, block_num) values('', '')"
+        elif self.selected_table == "plumbing":
+            request = "insert into plumbing(report, block_num) values('', '')"
+        if request != '':
+            self.con.execute(request)
+            self.con.commit()
+            self.admin_fill_table()
 
 
 class PlumberSpace(WorkWithBase):
