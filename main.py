@@ -296,12 +296,12 @@ class WashingList(WorkWithBase):
             self.row_created = True
             self.cur.execute(
                 f"insert into washing(name, wash_num, day, time) "
-                f"values('{'_'.join(self.user_name.split())}', '{self.mashin_num.text()}', "
+                f"values('{self.user_name}', '{self.mashin_num.text()}', "
                 f"'{self.wash_date.text()}', '{self.time.text()}')")
             self.con.commit()
             self.fill_table()
             self.row_id = self.cur.execute(f"select washid from washing where "
-                                           f"name='{'_'.join(self.user_name.split())}' and"
+                                           f"name='{self.user_name}' and"
                                            f" wash_num='{self.mashin_num.text()}' and "
                                            f"day='{self.wash_date.text()}' and "
                                            f"time='{self.time.text()}'").fetchall()[0][0]
@@ -457,49 +457,79 @@ class AdminSpace(WorkWithBase):
         self.table_line.addItems(["students", "employers", "washing", "working", "plumbing"])
         self.table_line.setCurrentText("students")
 
-        self.args = {"table": "students", "id_name": "id"}
-        self.columns = ['Номер ученика', 'ФИ', "Номер блока"]
+        self.table_changed()
         self.admin_fill_table()
+        self.changes = []
 
         self.table_line.currentTextChanged.connect(self.table_changed)
         self.save_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
+        self.table.itemSelectionChanged.connect(self.item_selected)
         self.create_button.clicked.connect(self.create_row)
-        self.delete_button.clicked.connect(self.delete)
+        self.delete_button.clicked.connect(self.delete_row)
         self.update_button.clicked.connect(self.admin_fill_table)
 
+        self.modified = {}
         self.row_sent = True
         self.row_created = False
+        self.selected = False
         self.selected_table = self.table_line.currentText()
-
 
     def table_changed(self):
         self.selected_table = self.table_line.currentText()
         if self.selected_table == "students":
             self.args = {"table": "students", "id_name": "id"}
             self.columns = ['Номер ученика', 'ФИ', "Номер блока"]
+            self.keys = {'Номер ученика': 'id', 'ФИ': 'studentName', "Номер блока": 'studentBlock'}
         elif self.selected_table == "employers":
             self.args = {"table": "employers", "id_name": "emp_id"}
             self.columns = ['Номер сотрудника', 'ФИО', "Должность", "Пароль"]
+            self.keys = {'Номер сотрудника': 'emp_id', 'ФИО': 'name', "Должность": 'post', "Пароль": 'password'}
         elif self.selected_table == "washing":
             self.args = {"table": "washing", "id_name": "washid"}
-            self.columns = ['№_Стиралки', 'Время', 'ФИ', "Дата", '№_Стирки']
+            self.columns = ['№_Стирки', '№_Стиралки', 'Дата', "Время", 'ФИ']
+            self.keys = {'№_Стиралки': 'wash_num', 'Время': 'time', 'ФИ': 'name', "Дата": 'date', '№_Стирки': 'washid'}
         elif self.selected_table == "working":
             self.args = {"table": "working", "id_name": "workid"}
             self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+            self.keys = {'Номер жалобы': 'workid', 'Жалоба': 'report', 'Номер блока': 'block_num',
+                         'Статус': 'status', 'Выполнено': 'completed'}
         elif self.selected_table == "plumbing":
             self.args = {"table": "plumbing", "id_name": "plumbid"}
             self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+            self.keys = {'Номер жалобы': 'plumbid', 'Жалоба': 'report', 'Номер блока': 'block_num',
+                         'Статус': 'status', 'Выполнено': 'completed'}
         self.admin_fill_table()
 
-
-    def delete(self):
-        pass
+    def delete_row(self):
+        que = f"DELETE from {self.selected_table}"
+        que += f" WHERE {self.args['id_name']} = {self.selected_id}"
+        self.cur.execute(que)
+        self.con.commit()
+        self.admin_fill_table()
+        self.statusBar().showMessage("Готово")
+        self.changes.clear()
 
     def admin_fill_table(self):
         self.fill_table(self.columns)
         self.unfreeze_table()
         self.table.setEnabled(True)
+
+    def item_selected(self):
+        try:
+            self.selected = True
+            self.select = self.table.selectedItems()[0]
+            self.selected_key = self.table.horizontalHeaderItem(self.select.column()).text()
+            self.selected_id = self.table.item(self.select.row(), 0).text()
+        except IndexError:
+            pass
+
+    def item_changed(self, item):
+        try:
+            if item.text() == self.select.text():
+                self.changes.append((self.select, self.selected_key, self.selected_id))
+        except Exception:
+            pass
 
     def create_row(self):
         request = ''
@@ -517,6 +547,20 @@ class AdminSpace(WorkWithBase):
             self.con.execute(request)
             self.con.commit()
             self.admin_fill_table()
+        else:
+            self.row_id = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where "
+                                           f"report='' and block_num=''").fetchall()[0][0]
+            self.modified["id"] = self.row_id
+
+    def save_results(self):
+        for elem in self.changes:
+            que = f"UPDATE {self.selected_table} SET {self.keys[elem[1]]}='{elem[0].text()}'"
+            que += f"WHERE {self.args['id_name']} = {elem[2]}"
+            self.cur.execute(que)
+            self.con.commit()
+        self.admin_fill_table()
+        self.statusBar().showMessage("Готово")
+        self.changes.clear()
 
 
 class PlumberSpace(WorkWithBase):
