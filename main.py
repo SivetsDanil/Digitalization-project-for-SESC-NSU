@@ -2,14 +2,17 @@ import sqlite3
 import sys
 
 import PyQt5
-from PyQt5 import uic
+from PyQt5 import uic, QtGui
 from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget
+from PyQt5.QtGui import QPixmap, QImage
 
 
 class MainWindow(QMainWindow):
     con = sqlite3.connect("sesc_base.sqlite")
     cur = con.cursor()
+    image = QImage('front/logo.png')
+
 
     def moveCenter(self, win):
         screen_geometry = QApplication.desktop().availableGeometry()
@@ -33,6 +36,7 @@ class StartWindow(MainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi('front/title.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.moveCenter(self)
         self.setFixedSize(self.size())
         self.log_in_button.clicked.connect(self.log_in)
@@ -100,6 +104,7 @@ class MenuForm(MainWindow):
         self.parent = parent
         self.info = info
         uic.loadUi('front/menu.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.setFixedSize(self.size())
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
@@ -227,6 +232,8 @@ class WorkerList(WorkWithBase):
         self.row_created = False
         self.block_num = info[0]
         uic.loadUi('front/work_table.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
+        self.logo_label.setPixmap(QPixmap(self.image))
         self.setWindowTitle('Тетрадь для жалоб, плотническая')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -244,9 +251,11 @@ class PlumbingList(WorkWithBase):
         self.parent = parent
         self.block_num = info[0]
         uic.loadUi('front/plumb_table.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.setWindowTitle('Тетрадь для жалоб, сантехническая')
         self.setFixedSize(self.size())
         self.moveCenter(self)
+        self.logo_label.setPixmap(QPixmap(self.image))
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "plumbing", "id_name": "plumbid"}
 
@@ -266,6 +275,7 @@ class WashingList(WorkWithBase):
         self.block_num = info[0]
         self.user_name = info[1]
         uic.loadUi('front/wash_table.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.row_created = False
         self.row_sent = True
         self.setWindowTitle('Тетрадь для записей на стирку')
@@ -374,6 +384,7 @@ class Calender(QWidget):
     def __init__(self, parent):
         super().__init__()
         uic.loadUi('front/calender.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.parent = parent
         self.setWindowTitle('Выберите дату')
         self.set_date_button.clicked.connect(self.func)
@@ -389,6 +400,7 @@ class StaffTitle(MainWindow):
         super().__init__()
         self.parent = parent
         uic.loadUi('front/staff_title.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.setWindowTitle('Вход для сотрудников')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -458,6 +470,7 @@ class AdminSpace(WorkWithBase):
 
     def initUI(self):
         uic.loadUi('front/admin.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.setWindowTitle('Рабочее место администратора')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -570,6 +583,7 @@ class PlumberSpace(AdminSpace):
 
     def initUI(self):
         uic.loadUi('front/plumber.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.setWindowTitle('Рабочее место сантехника')
         self.args = {"table": "plumbing", "id_name": "plumbid"}
         self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
@@ -597,6 +611,7 @@ class WorkerSpace(AdminSpace):
 
     def initUI(self):
         uic.loadUi('front/worker.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
         self.setWindowTitle('Рабочее место сантехника')
         self.args = {"table": "working", "id_name": "workid"}
         self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
@@ -625,5 +640,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = StartWindow()
     ex.show()
-    sys.excepthook = exept
     sys.exit(app.exec_())
