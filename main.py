@@ -3,7 +3,7 @@ import sys
 
 import PyQt5
 from PyQt5 import uic
-from PyQt5.QtCore import QDate
+from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget
 
 
@@ -43,8 +43,8 @@ class StartWindow(MainWindow):
         self.room_number.setPlaceholderText("222")
         self.staff_log_in_button.clicked.connect(self.staff_log_in)
         self.clear()
-
-
+        self.room_number.returnPressed.connect(self.log_in)
+        self.user_name.returnPressed.connect(self.log_in)
 
     def log_in(self):
         self.block_num = self.room_number.text()
@@ -394,6 +394,8 @@ class StaffTitle(MainWindow):
         self.moveCenter(self)
         self.log_in_button.clicked.connect(self.log_in)
         self.exit_button.clicked.connect(self.exit)
+        self.pass_line.returnPressed.connect(self.log_in)
+        self.staff_name.returnPressed.connect(self.log_in)
 
     def log_in(self):
         self.user_name = self.staff_name.text()
