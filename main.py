@@ -4,8 +4,7 @@ import sys
 import PyQt5
 from PyQt5 import uic
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget,
-                             QComboBox, QPushButton, QTableWidget)
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget
 
 
 class MainWindow(QMainWindow):
@@ -33,7 +32,7 @@ class MainWindow(QMainWindow):
 class StartWindow(MainWindow):
     def __init__(self):
         super().__init__()
-        uic.loadUi('title.ui', self)
+        uic.loadUi('front/title.ui', self)
         self.moveCenter(self)
         self.setFixedSize(self.size())
         self.log_in_button.clicked.connect(self.log_in)
@@ -101,7 +100,7 @@ class MenuForm(MainWindow):
         super().__init__()
         self.parent = parent
         self.info = info
-        uic.loadUi('menu.ui', self)
+        uic.loadUi('front/menu.ui', self)
         self.setFixedSize(self.size())
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
@@ -178,15 +177,18 @@ class WorkWithBase(MainWindow):
                     item.setFlags(PyQt5.QtCore.Qt.ItemIsEnabled)
                 self.table.setItem(row, col, item)
 
-    def unfreeze_table(self):
+    def unfreeze_table(self, exep=None):
+        if exep is None:
+            exep = []
         rows = self.table.rowCount()
         cols = self.table.columnCount()
         for row in range(rows):
             for col in range(cols):
-                item = self.table.item(row, col)
-                item.setFlags(PyQt5.QtCore.Qt.ItemIsEditable | PyQt5.QtCore.Qt.ItemIsSelectable
-                              | PyQt5.QtCore.Qt.ItemIsEnabled)
-                self.table.setItem(row, col, item)
+                if col not in exep:
+                    item = self.table.item(row, col)
+                    item.setFlags(PyQt5.QtCore.Qt.ItemIsEditable | PyQt5.QtCore.Qt.ItemIsSelectable
+                                  | PyQt5.QtCore.Qt.ItemIsEnabled)
+                    self.table.setItem(row, col, item)
 
     def save_results(self):
         self.statusBar().clearMessage()
@@ -226,7 +228,7 @@ class WorkerList(WorkWithBase):
         self.row_sent = True
         self.row_created = False
         self.block_num = info[0]
-        uic.loadUi('work_table.ui', self)
+        uic.loadUi('front/work_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, плотническая')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -243,7 +245,7 @@ class PlumbingList(WorkWithBase):
         super().__init__()
         self.parent = parent
         self.block_num = info[0]
-        uic.loadUi('plumb_table.ui', self)
+        uic.loadUi('front/plumb_table.ui', self)
         self.setWindowTitle('Тетрадь для жалоб, сантехническая')
         self.setFixedSize(self.size())
         self.moveCenter(self)
@@ -265,7 +267,7 @@ class WashingList(WorkWithBase):
         self.parent = parent
         self.block_num = info[0]
         self.user_name = info[1]
-        uic.loadUi('wash_table.ui', self)
+        uic.loadUi('front/wash_table.ui', self)
         self.row_created = False
         self.row_sent = True
         self.setWindowTitle('Тетрадь для записей на стирку')
@@ -373,7 +375,7 @@ class WashingList(WorkWithBase):
 class Calender(QWidget):
     def __init__(self, parent):
         super().__init__()
-        uic.loadUi('calender.ui', self)
+        uic.loadUi('front/calender.ui', self)
         self.parent = parent
         self.setWindowTitle('Выберите дату')
         self.set_date_button.clicked.connect(self.func)
@@ -388,15 +390,17 @@ class StaffTitle(MainWindow):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        uic.loadUi('staff_title.ui', self)
+        uic.loadUi('front/staff_title.ui', self)
         self.setWindowTitle('Вход для сотрудников')
         self.setFixedSize(self.size())
         self.moveCenter(self)
         self.log_in_button.clicked.connect(self.log_in)
         self.exit_button.clicked.connect(self.exit)
 
-        self.staff_name.setText("admin")
-        self.pass_line.setText("admin")
+        ##self.staff_name.setText("admin")
+        ##self.pass_line.setText("admin")
+        self.staff_name.setText("plumber")
+        self.pass_line.setText("plumber")
 
     def log_in(self):
         self.user_name = self.staff_name.text()
@@ -449,18 +453,23 @@ class AdminSpace(WorkWithBase):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        uic.loadUi('admin.ui', self)
+        self.modified = {}
+        self.changes = []
+        self.row_sent = True
+        self.row_created = False
+        self.selected = False
+        self.initUI()
+
+    def initUI(self):
+        uic.loadUi('front/admin.ui', self)
         self.setWindowTitle('Рабочее место администратора')
         self.setFixedSize(self.size())
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
         self.table_line.addItems(["students", "employers", "washing", "working", "plumbing"])
         self.table_line.setCurrentText("students")
-
         self.table_changed()
         self.admin_fill_table()
-        self.changes = []
-
         self.table_line.currentTextChanged.connect(self.table_changed)
         self.save_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
@@ -468,11 +477,6 @@ class AdminSpace(WorkWithBase):
         self.create_button.clicked.connect(self.create_row)
         self.delete_button.clicked.connect(self.delete_row)
         self.update_button.clicked.connect(self.admin_fill_table)
-
-        self.modified = {}
-        self.row_sent = True
-        self.row_created = False
-        self.selected = False
         self.selected_table = self.table_line.currentText()
 
     def table_changed(self):
@@ -513,7 +517,6 @@ class AdminSpace(WorkWithBase):
     def admin_fill_table(self):
         self.fill_table(self.columns)
         self.unfreeze_table()
-        self.table.setEnabled(True)
 
     def item_selected(self):
         try:
@@ -521,6 +524,7 @@ class AdminSpace(WorkWithBase):
             self.select = self.table.selectedItems()[0]
             self.selected_key = self.table.horizontalHeaderItem(self.select.column()).text()
             self.selected_id = self.table.item(self.select.row(), 0).text()
+            self.table.itemChanged.connect(self.item_changed)
         except IndexError:
             pass
 
@@ -563,26 +567,58 @@ class AdminSpace(WorkWithBase):
         self.changes.clear()
 
 
-class PlumberSpace(WorkWithBase):
+class PlumberSpace(AdminSpace):
     def __init__(self, parent):
-        super().__init__()
+        super().__init__(None)
         self.parent = parent
-        uic.loadUi('plumber.ui', self)
+
+    def initUI(self):
+        uic.loadUi('front/plumber.ui', self)
         self.setWindowTitle('Рабочее место сантехника')
+        self.args = {"table": "plumbing", "id_name": "plumbid"}
+        self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+        self.keys = {'Номер жалобы': 'plumbid', 'Жалоба': 'report', 'Номер блока': 'block_num',
+                     'Статус': 'status', 'Выполнено': 'completed'}
+        self.selected_table = "plumbing"
         self.setFixedSize(self.size())
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
+        self.plumber_fill_table()
+        self.table.itemChanged.connect(self.item_changed)
+        self.update_button.clicked.connect(self.plumber_fill_table)
+        self.save_button.clicked.connect(self.save_results)
+        self.table.itemSelectionChanged.connect(self.item_selected)
+
+    def plumber_fill_table(self):
+        self.fill_table(self.columns)
+        self.unfreeze_table([0, 1, 2])
 
 
-class WorkerSpace(WorkWithBase):
+class WorkerSpace(AdminSpace):
     def __init__(self, parent):
-        super().__init__()
-        self.setWindowTitle('Рабочее место плотника')
+        super().__init__(None)
         self.parent = parent
-        uic.loadUi('worker.ui', self)
+
+    def initUI(self):
+        uic.loadUi('front/worker.ui', self)
+        self.setWindowTitle('Рабочее место сантехника')
+        self.args = {"table": "working", "id_name": "workid"}
+        self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+        self.keys = {'Номер жалобы': 'workid', 'Жалоба': 'report', 'Номер блока': 'block_num',
+                     'Статус': 'status', 'Выполнено': 'completed'}
+        self.selected_table = "working"
         self.setFixedSize(self.size())
         self.moveCenter(self)
         self.exit_button.clicked.connect(self.exit)
+        self.plumber_fill_table()
+        self.table.itemChanged.connect(self.item_changed)
+        self.update_button.clicked.connect(self.plumber_fill_table)
+        self.save_button.clicked.connect(self.save_results)
+        self.table.itemSelectionChanged.connect(self.item_selected)
+
+    def plumber_fill_table(self):
+        self.fill_table(self.columns)
+        self.unfreeze_table([0, 1, 2])
 
 
 def exept(a, b, c):
