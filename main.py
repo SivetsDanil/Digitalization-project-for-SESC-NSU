@@ -223,6 +223,11 @@ class WorkWithBase(MainWindow):
         except Exception:
             pass
 
+    def staff_save(self):
+        self.save_results()
+        self.freeze_row(-1)
+        self.unfreeze_table([0, 1, 2])
+
 
 class WorkerList(WorkWithBase):
     def __init__(self, parent, info):
@@ -596,11 +601,12 @@ class PlumberSpace(AdminSpace):
         self.plumber_fill_table()
         self.table.itemChanged.connect(self.item_changed)
         self.update_button.clicked.connect(self.plumber_fill_table)
-        self.save_button.clicked.connect(self.save_results)
+        self.save_button.clicked.connect(self.staff_save)
         self.table.itemSelectionChanged.connect(self.item_selected)
 
     def plumber_fill_table(self):
         self.fill_table(self.columns)
+        self.freeze_row(-1)
         self.unfreeze_table([0, 1, 2])
 
 
@@ -610,28 +616,28 @@ class WorkerSpace(AdminSpace):
         self.parent = parent
 
     def initUI(self):
-        try:
-            uic.loadUi('front/worker.ui', self)
-            self.setWindowIcon(QtGui.QIcon('front/icon.png'))
-            self.setWindowTitle('Рабочее место сантехника')
-            self.args = {"table": "working", "id_name": "workid"}
-            self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
-            self.keys = {'Номер жалобы': 'workid', 'Жалоба': 'report', 'Номер блока': 'block_num',
-                         'Статус': 'status', 'Выполнено': 'completed'}
-            self.selected_table = "working"
-            self.setFixedSize(self.size())
-            self.moveCenter(self)
-            self.exit_button.clicked.connect(self.exit)
-            self.plumber_fill_table()
-            self.table.itemChanged.connect(self.item_changed)
-            self.update_button.clicked.connect(self.plumber_fill_table)
-            self.save_button.clicked.connect(self.save_results)
-            self.table.itemSelectionChanged.connect(self.item_selected)
-        except Exception as e:
-            print(e)
-    def plumber_fill_table(self):
+        uic.loadUi('front/worker.ui', self)
+        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
+        self.setWindowTitle('Рабочее место плотника')
+        self.args = {"table": "working", "id_name": "workid"}
+        self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+        self.keys = {'Номер жалобы': 'workid', 'Жалоба': 'report', 'Номер блока': 'block_num',
+                     'Статус': 'status', 'Выполнено': 'completed'}
+        self.selected_table = "working"
+        self.setFixedSize(self.size())
+        self.moveCenter(self)
+        self.exit_button.clicked.connect(self.exit)
+        self.worker_fill_table()
+        self.table.itemChanged.connect(self.item_changed)
+        self.update_button.clicked.connect(self.worker_fill_table)
+        self.save_button.clicked.connect(self.staff_save)
+        self.table.itemSelectionChanged.connect(self.item_selected)
+
+    def worker_fill_table(self):
         self.fill_table(self.columns)
+        self.freeze_row(-1)
         self.unfreeze_table([0, 1, 2])
+
 
 
 def exept(a, b, c):
@@ -639,6 +645,7 @@ def exept(a, b, c):
 
 
 if __name__ == '__main__':
+    sys.excepthook = exept
     app = QApplication(sys.argv)
     ex = StartWindow()
     ex.show()
