@@ -44,8 +44,7 @@ class StartWindow(MainWindow):
         self.staff_log_in_button.clicked.connect(self.staff_log_in)
         self.clear()
 
-        self.user_name.setText("Сивец Данил")
-        self.room_number.setText("236")
+
 
     def log_in(self):
         self.block_num = self.room_number.text()
@@ -396,11 +395,6 @@ class StaffTitle(MainWindow):
         self.moveCenter(self)
         self.log_in_button.clicked.connect(self.log_in)
         self.exit_button.clicked.connect(self.exit)
-
-        ##self.staff_name.setText("admin")
-        ##self.pass_line.setText("admin")
-        self.staff_name.setText("plumber")
-        self.pass_line.setText("plumber")
 
     def log_in(self):
         self.user_name = self.staff_name.text()
