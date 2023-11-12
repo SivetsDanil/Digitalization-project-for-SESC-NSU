@@ -610,23 +610,25 @@ class WorkerSpace(AdminSpace):
         self.parent = parent
 
     def initUI(self):
-        uic.loadUi('front/worker.ui', self)
-        self.setWindowIcon(QtGui.QIcon('front/icon.png'))
-        self.setWindowTitle('Рабочее место сантехника')
-        self.args = {"table": "working", "id_name": "workid"}
-        self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
-        self.keys = {'Номер жалобы': 'workid', 'Жалоба': 'report', 'Номер блока': 'block_num',
-                     'Статус': 'status', 'Выполнено': 'completed'}
-        self.selected_table = "working"
-        self.setFixedSize(self.size())
-        self.moveCenter(self)
-        self.exit_button.clicked.connect(self.exit)
-        self.plumber_fill_table()
-        self.table.itemChanged.connect(self.item_changed)
-        self.update_button.clicked.connect(self.plumber_fill_table)
-        self.save_button.clicked.connect(self.save_results)
-        self.table.itemSelectionChanged.connect(self.item_selected)
-
+        try:
+            uic.loadUi('front/worker.ui', self)
+            self.setWindowIcon(QtGui.QIcon('front/icon.png'))
+            self.setWindowTitle('Рабочее место сантехника')
+            self.args = {"table": "working", "id_name": "workid"}
+            self.columns = ['Номер жалобы', 'Жалоба', 'Номер блока', 'Статус', 'Выполнено']
+            self.keys = {'Номер жалобы': 'workid', 'Жалоба': 'report', 'Номер блока': 'block_num',
+                         'Статус': 'status', 'Выполнено': 'completed'}
+            self.selected_table = "working"
+            self.setFixedSize(self.size())
+            self.moveCenter(self)
+            self.exit_button.clicked.connect(self.exit)
+            self.plumber_fill_table()
+            self.table.itemChanged.connect(self.item_changed)
+            self.update_button.clicked.connect(self.plumber_fill_table)
+            self.save_button.clicked.connect(self.save_results)
+            self.table.itemSelectionChanged.connect(self.item_selected)
+        except Exception as e:
+            print(e)
     def plumber_fill_table(self):
         self.fill_table(self.columns)
         self.unfreeze_table([0, 1, 2])

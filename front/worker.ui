@@ -49,7 +49,7 @@
     <string>Выход</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="pushButton">
+  <widget class="QPushButton" name="save_button">
    <property name="geometry">
     <rect>
      <x>180</x>
