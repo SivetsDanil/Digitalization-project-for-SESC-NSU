@@ -125,7 +125,7 @@ class MenuForm(MainWindow):
 
 class WorkWithBase(MainWindow):
     def create_row(self):
-        if self.row_sent and not self.row_created:
+        if self.row_sent and not self.row_created and self.table.item(self.table.rowCount() - 1, 1).text() != '':
             self.row_created = True
             self.row_sent = False
             self.modified = {}
@@ -134,7 +134,7 @@ class WorkWithBase(MainWindow):
             self.fill_table()
             self.row_id = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where "
                                            f"report='' and block_num=''").fetchall()[0][0]
-        elif not self.row_sent:
+        elif not self.row_sent or self.table.item(self.table.rowCount() - 1, 1) != '':
             self.statusBar().showMessage("Прошлая жалоба еще не отправлена!")
         elif self.row_created:
             self.statusBar().showMessage("По одной записи в день!")
@@ -192,7 +192,6 @@ class WorkWithBase(MainWindow):
     def save_results(self):
         self.statusBar().clearMessage()
         try:
-            print(self.modified)
             if "report" not in self.modified or self.modified["report"] == '':
                 raise ValueError("Вы не написали жалобу!")
             elif "block_num" not in self.modified or self.modified["block_num"] != str(self.block_num):
@@ -213,7 +212,7 @@ class WorkWithBase(MainWindow):
 
     def item_changed(self, item):
         try:
-            if self.row_created and self.table.item(self.table.rowCount() - 1, 0).text() == self.row_id:
+            if self.row_created and item.row() == self.table.rowCount() - 1:
                 self.modified["id"] = self.row_id
                 self.modified[self.titles[item.column()]] = item.text()
         except Exception:
@@ -410,6 +409,7 @@ class StaffTitle(MainWindow):
                 self.open_form = WorkerSpace(self)
             else:
                 self.statusBar().showMessage("Ваша должность некорректна, обратитесь к админестратору")
+                return
             self.open_form.show()
             self.close()
 
