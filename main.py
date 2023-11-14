@@ -3,7 +3,7 @@ import sys
 
 import PyQt5
 from PyQt5 import uic, QtGui
-from PyQt5.QtCore import QDate, Qt
+from PyQt5.QtCore import QDate
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStatusBar, QTableWidgetItem, QWidget
 from PyQt5.QtGui import QPixmap, QImage
 
@@ -122,8 +122,16 @@ class MenuForm(MainWindow):
         if sender == 'washing_button':
             self.open_form = WashingList(self, self.info)
         elif sender == 'worker_button':
+            elems = self.cur.execute("select workid from working where report=''").fetchall()
+            for elem in elems:
+                self.cur.execute(f'delete from working where workid={str(elem[0])}')
+            self.con.commit()
             self.open_form = WorkerList(self, self.info)
         elif sender == 'plumbing_button':
+            elems = self.cur.execute(f"select plumbid from plumbing where report=''").fetchall()
+            for elem in elems:
+                self.cur.execute(f'delete from plumbing where plumbid={str(elem[0])}')
+            self.con.commit()
             self.open_form = PlumbingList(self, self.info)
         self.open_form.show()
 
@@ -228,6 +236,13 @@ class WorkWithBase(MainWindow):
         self.freeze_row(-1)
         self.unfreeze_table([0, 1, 2])
 
+    def exit(self):
+        elems = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where report=''").fetchall()
+        for elem in elems:
+            self.cur.execute(f'delete from {self.args["table"]} where {self.args["id_name"]}={str(elem[0])}')
+        self.con.commit()
+        super().exit()
+
 
 class WorkerList(WorkWithBase):
     def __init__(self, parent, info):
@@ -263,10 +278,8 @@ class PlumbingList(WorkWithBase):
         self.logo_label.setPixmap(QPixmap(self.image))
         self.exit_button.clicked.connect(self.exit)
         self.args = {"table": "plumbing", "id_name": "plumbid"}
-
         self.row_sent = True
         self.row_created = False
-
         self.fill_table()
         self.send_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
