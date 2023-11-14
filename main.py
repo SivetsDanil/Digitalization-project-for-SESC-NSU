@@ -147,7 +147,7 @@ class WorkWithBase(MainWindow):
             self.fill_table()
             self.row_id = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where "
                                            f"report='' and block_num=''").fetchall()[0][0]
-        elif not self.row_sent or self.table.item(self.table.rowCount() - 1, 1) != '':
+        elif not self.row_sent:
             self.statusBar().showMessage("Прошлая жалоба еще не отправлена!")
         elif self.row_created:
             self.statusBar().showMessage("По одной записи в день!")
