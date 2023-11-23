@@ -236,12 +236,7 @@ class WorkWithBase(MainWindow):
         self.freeze_row(-1)
         self.unfreeze_table([0, 1, 2])
 
-    def exit(self):
-        elems = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where report=''").fetchall()
-        for elem in elems:
-            self.cur.execute(f'delete from {self.args["table"]} where {self.args["id_name"]}={str(elem[0])}')
-        self.con.commit()
-        super().exit()
+
 
 
 class WorkerList(WorkWithBase):
@@ -264,6 +259,13 @@ class WorkerList(WorkWithBase):
         self.table.itemChanged.connect(self.item_changed)
         self.create_button.clicked.connect(self.create_row)
 
+    def exit(self):
+        elems = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where report=''").fetchall()
+        for elem in elems:
+            self.cur.execute(f'delete from {self.args["table"]} where {self.args["id_name"]}={str(elem[0])}')
+        self.con.commit()
+        super().exit()
+
 
 class PlumbingList(WorkWithBase):
     def __init__(self, parent, info):
@@ -284,6 +286,13 @@ class PlumbingList(WorkWithBase):
         self.send_button.clicked.connect(self.save_results)
         self.table.itemChanged.connect(self.item_changed)
         self.create_button.clicked.connect(self.create_row)
+
+    def exit(self):
+        elems = self.cur.execute(f"select {self.args['id_name']} from {self.args['table']} where report=''").fetchall()
+        for elem in elems:
+            self.cur.execute(f'delete from {self.args["table"]} where {self.args["id_name"]}={str(elem[0])}')
+        self.con.commit()
+        super().exit()
 
 
 class WashingList(WorkWithBase):
